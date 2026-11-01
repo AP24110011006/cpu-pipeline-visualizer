@@ -1,111 +1,76 @@
-# CPU PIPELINE STUDIO
+# ⚠️ Hazard Detection Subsystem — MANIKANTH
 
-**Advanced CPU Pipeline Simulation, Hazard Analysis and Performance Engineering Platform**
-
-A commercial-grade Computer Organization and Architecture (COA) simulation, hazard analytics, and hardware verification studio built with Python, Streamlit, Plotly, and Pytest.
-
-Implements a cycle-by-cycle **5-stage MIPS pipeline** (**IF · ID · EX · MEM · WB**), instruments hardware forwarding bypass paths, models load-use and speculative branch execution, audits mathematical slot conservation without double counting, provides 5 automated verification bots, and features a dedicated **Full Stack Engineering Agent**.
-
----
-
-## 🎨 Design System: Midnight Engineering
-
-CPU PIPELINE STUDIO features a bespoke, accessible **Midnight Engineering** theme:
-- **Background**: `#0B1220` · **Main Surface**: `#111C2E` · **Secondary Surface**: `#162338` · **Borders**: `#27364B`
-- **Primary Accent**: `#22D3EE` · **Secondary Accent**: `#A78BFA`
-- **Status Accents**: Success `#10B981` · Warning `#F59E0B` · Error `#F43F5E`
-- **Typography & Labels**: Primary `#F1F5F9` · Secondary `#94A3B8` · Muted `#64748B`
-
-### Unified Pipeline Stage Colors
-- **IF (Instruction Fetch)**: `#3B82F6` (Core Blue)
-- **ID (Instruction Decode)**: `#8B5CF6` (Deep Violet)
-- **EX (Execute / ALU)**: `#F59E0B` (Warm Amber)
-- **MEM (Memory Access)**: `#06B6D4` (Cyan Blue)
-- **WB (Write Back)**: `#10B981` (Emerald Green)
-- **STALL**: `#EF4444` · **BUBBLE**: `#64748B` · **FORWARDING**: `#22D3EE` · **FLUSH**: `#F43F5E`
-
-*An optional Clean Engineering Light Theme is available via the sidebar toggle.*
+**Lead Engineer**: **MANIKANTH** (`MK`)  
+**Role**: **Hazard Detection Developer**  
+**Assigned Subsystem**: Data Hazard Detection, Stall Accounting, Pipeline Analytics & Conservation Auditing  
+**Verification Suite**: `tests/test_hazards.py`, `tests/test_analytics.py`, `tests/test_metrics.py`, `bots/hazard_bot.py` (76/76 Checks Passed)
 
 ---
 
-## 🏛️ The 11 Dedicated Workspaces
+## 🎯 Architectural Mission & Role Overview
 
-1. 📊 **Overview Dashboard**: High-level execution telemetry, CPI/IPC, dynamic hazard counters, stall cycles, avoided stalls, and engineering status.
-2. 💻 **Assembly Simulator**: Interactive assembly editor, line numbers, error diagnostics, presets, register/memory initializers, and compilation controls.
-3. ⏱️ **Pipeline Visualization**: Cycle-by-cycle stage cards (`IF`, `ID`, `EX`, `MEM`, `WB`), pedagogical explainer glass cards, and Plotly timing diagrams.
-4. ⚡ **Forwarding Comparison**: Side-by-side Forwarding ON vs. OFF comparison with independent Diagram View Modes (`Window around cycle (Fast)` vs. `Full program`) and cycle synchronization.
-5. ⚠️ **Hazard & Stall Analytics**: Detailed static vs. dynamic RAW counters, load-use events, stall events vs. stall clock cycles, stalls avoided, and complete searchable Event History.
-6. 🧮 **Registers & Memory**: Live cycle-by-cycle inspection of registers (`R0`–`R31`) and data RAM with formal unpipelined Reference CPU differential check.
-7. 📈 **Performance Analysis**: Quantitative metrics (CPI, IPC, Speedup vs. Unpipelined, Pipeline Efficiency) and hardware stage utilization bar charts.
-8. 👥 **Developer Team & Progress**: 5-role architecture ownership tracking with evidence-based task tracking and verified test suites.
-9. 🤖 **Intelligent Testing Bots & Engineering Agent**: Suite of 5 automated invariant bots, topological scheduler, and the autonomous Full Stack Engineering Agent.
-10. 📚 **COA Learning Center**: Comprehensive educational guide, quantitative COA equations, and microarchitectural glossary.
-11. ⚙️ **Settings & Configuration**: Safety bounds, execution limits, session cache clearing, and environment diagnostics.
+As the **Hazard Detection Developer**, Manikanth is responsible for the microarchitectural safety, mathematical conservation, and hazard detection logic of the 5-stage CPU pipeline. 
 
----
+In a pipelined CPU, instructions execute concurrently across five stages: **IF (Fetch) · ID (Decode) · EX (Execute) · MEM (Memory) · WB (Write Back)**. When instructions depend on data produced by prior uncompleted instructions, **Read-After-Write (RAW) data hazards** arise. If unmanaged, the pipeline would read stale register values, producing incorrect execution results.
 
-## 👥 Authoritative Developer Team Architecture
+Manikanth's subsystem:
+1. **Detects RAW Hazards Dynamically**: Evaluates register dependencies between the instruction in the `ID` stage and in-flight instructions in `EX`, `MEM`, and `WB`.
+2. **Inserts Stall Bubbles**: Freezes `IF` and `ID` stages while latching bubble instructions into `EX` when data cannot be bypassed.
+3. **Implements Split-Phase Register Timing**: Accurately models the physical hardware invariant where the register file is written in the first half of the clock cycle (during `WB`) and read in the second half of the cycle (during `ID`). This eliminates stalls for distance-3 dependencies.
+4. **Disambiguates Stalls vs. Events**: Strictly differentiates between *discrete stall events* and *stall clock cycles* (e.g., a load-use stall without forwarding causes 1 stall event spanning 2 clock cycles).
+5. **Enforces Mathematical Conservation**: Validates that every execution run strictly obeys microarchitectural conservation laws without double-counting.
 
-| Role | Lead | Assigned Module | Verified Test Suite | Status |
-|:---|:---|:---|:---|:---:|
-| **Instruction Parser Developer** | **REHMAN** (`RH`) | `simulator/parser.py` | `tests/test_parser.py` (13 tests) | Verified Core • Active |
-| **Pipeline Simulation Developer** | **Likhith** (`LK`) | `simulator/pipeline.py`, `simulator/models.py` | `tests/test_pipeline.py`, `tests/test_reference.py` (17 tests) | Verified Core • Active |
-| **Hazard Detection Developer** | **MANIKANTH** (`MK`) | `simulator/hazards.py`, `simulator/analytics/` | `tests/test_hazards.py`, `tests/test_analytics.py` (12 tests) | Verified Core • Active |
-| **Forwarding & Control Hazard Developer** | **LATHISH** (`LT`) | `simulator/forwarding.py`, control logic | `tests/test_forwarding.py` (13 tests) | Verified Core • Active |
-| **UI & Visualization Developer** | **MADHAN** (`MD`) | `app.py`, `ui/` | `tests/test_engine_and_explainer.py` (14 tests) | Verified Core • Active |
-
-*Progress is strictly evidence-based and calculated directly from completed vs. total task backlog.*
+$$\text{Total Slots} = 5 \times \text{Cycles} = \text{Useful Instruction Slots} + \text{Bubble Slots}$$
 
 ---
 
-## 🤖 Intelligent Multi-Bot Suite & Engineering Agent
+## 📦 Delivered Modules & File Explanations
 
-### 1. Invariant Verification Bots
-- **Bot 1 — Testing Bot** (`bots/test_bot.py`): 27 textbook regression scenarios and 10 negative syntax edge-case rejections.
-- **Bot 2 — Verification Bot** (`bots/verifier_bot.py`): Differential validation against unpipelined Reference CPU across 800 pipeline runs and structural invariants.
-- **Bot 3 — Assembly Optimization Bot** (`bots/dev_bot.py`): DAG topological dependency scheduling, RAW/WAR/WAW ordering preservation, and assembly workload synthesis.
-- **Bot 4 — Stress Testing Bot** (`bots/stress_bot.py`): Scalability benchmarking from 100 to 5,000 instructions, memory allocation tracking, and safe cycle cutoff.
-- **Bot 5 — Hazard Analysis Bot** (`bots/hazard_bot.py`): Microarchitectural conservation law verification ($\text{Total Slots} = 5 \times \text{Cycles} = \text{Useful} + \text{Bubbles}$) and zero double-counting audits.
-
-### 2. Autonomous Full Stack Engineering Agent (`agents/`)
-- **Repository Intelligence**: Structural directory inspection, module responsibility mapping, and AST import dependency analysis.
-- **Risk-Aware Task Planning**: Generates step-by-step implementation plans outlining targeted files and risk mitigations.
-- **Controlled File Modification**: Workspace sandbox isolation, path traversal prevention, unified git diff generation, and safe rollback.
-- **Diagnostic Engine & Bounded Repair**: Automatically captures test failure tracebacks, isolates root causes, synthesizes targeted repairs, and verifies completion.
-- **Approval Controls**: Human-in-the-loop review before staging and applying modifications to disk.
-
----
-
-## 🚀 Setup & Execution (Windows)
-
-1. Open PowerShell or Command Prompt:
-   ```powershell
-   cd pipeline-execution-visualizer
-   ```
-
-2. Run the application:
-   ```powershell
-   py -3.12 -m streamlit run app.py
-   ```
-   Or double-click `run_windows.bat`.
-
-3. Access the web application at **`http://localhost:8501`**.
+| Module / File | Component Responsibility & Implementation Details |
+|:---|:---|
+| [`simulator/hazards.py`](simulator/hazards.py) | **Core Hazard Detection Engine**<br>• Implements `detect_data_stall()`: Cycle-by-cycle dynamic hazard detection inspecting consumer operands in `ID` against active producers in `EX`, `MEM`, and `WB`.<br>• Implements `find_raw_hazards()`: Static dependency analyzer mapping all RAW hazards, producer-consumer pairs, and distance metrics.<br>• Implements `find_control_instructions()`: Static scanner detecting branches and jumps.<br>• Defines `StallInfo`: Structured diagnostic record detailing consumer, producer, register index, stage, and explanation. |
+| [`simulator/analytics/__init__.py`](simulator/analytics/__init__.py) | **Analytics Package Interface**<br>Exposes high-level analytics builders, event trackers, and diagnostic report generators. |
+| [`simulator/analytics/event_tracker.py`](simulator/analytics/event_tracker.py) | **Real-Time Event Tracking Framework**<br>Structured event bus recording cycle-by-cycle microarchitectural occurrences: hazard detections, stall insertions, bypass forwarding transfers, and branch flushes. |
+| [`simulator/analytics/hazard_analytics.py`](simulator/analytics/hazard_analytics.py) | **Hazard Classification & Telemetry**<br>Aggregates dynamic hazard metrics, categorizes dependencies (ALU-to-ALU vs. Load-Use), calculates distance distributions, and maps producer-consumer hazard chains. |
+| [`simulator/analytics/stall_analytics.py`](simulator/analytics/stall_analytics.py) | **Stall Cycle & Bubble Accounting**<br>Quantifies stall cycles vs. discrete events, measures wasted stage slots, accounts for stalls avoided by hardware forwarding, and computes pipeline stall penalty rates. |
+| [`simulator/analytics/report_builder.py`](simulator/analytics/report_builder.py) | **Executive Diagnostic Report Builder**<br>Compiles complete simulation statistics into structured diagnostic reports (`PipelineAnalyticsReport`) for visualization in the UI. |
+| [`simulator/metrics.py`](simulator/metrics.py) | **Performance Metrics Engine**<br>Computes quantitative architectural metrics: Cycles Per Instruction (CPI), Instructions Per Cycle (IPC), Speedup vs. Unpipelined Reference CPU, and Stage Utilization. |
+| [`bots/hazard_bot.py`](bots/hazard_bot.py) | **Bot 5: Hazard Analysis Bot (Invariant Auditor)**<br>Autonomous verification bot running 76 microarchitectural invariant audits: verifies mathematical slot conservation, zero double-counting across stages, and forwarding causality. |
+| [`tests/test_hazards.py`](tests/test_hazards.py) | **Hazard Unit Test Suite**<br>Verifies RAW detection across distance 1, 2, and 3 dependencies, load-use delays, $R0$ hazard immunity, and stall insertion. |
+| [`tests/test_analytics.py`](tests/test_analytics.py) | **Analytics & Event Tracker Test Suite**<br>Verifies event recording fidelity, hazard breakdown aggregation, and report generation accuracy. |
+| [`tests/test_metrics.py`](tests/test_metrics.py) | **Metrics Calculation Test Suite**<br>Validates mathematical accuracy of CPI, IPC, speedup formulas, and edge cases (e.g. empty programs, single-instruction programs). |
+| [`examples/hazards/load_use.s`](examples/hazards/load_use.s) | **Load-Use Benchmark Workload**<br>Curated assembly program demonstrating load-use data stalls under both Forwarding ON (1 stall) and Forwarding OFF (2 stalls). |
+| [`examples/hazards/raw_hazard.s`](examples/hazards/raw_hazard.s) | **RAW Cascade Benchmark Workload**<br>Intensive register dependency chain stressing multi-stage RAW hazard detection. |
 
 ---
 
-## 🧪 Automated Testing & Verification Baseline
+## 🔬 Mathematical Conservation Laws Verified
 
-Run the complete pytest regression suite:
-```powershell
-py -3.12 -m pytest -v             # 155 unit & regression tests (100% pass)
+Manikanth's subsystem proves and audits two fundamental microarchitectural conservation laws:
+
+### 1. Cycle Conservation Law
+$$\text{Total Execution Cycles} = \text{Ideal Cycles} + \text{Data Stall Cycles} + \text{Control Penalty Cycles}$$
+Where $\text{Ideal Cycles} = N + 4$ (for $N$ instructions in a 5-stage pipeline).
+
+### 2. Slot Conservation Law
+Every clock cycle advances 5 physical hardware stage slots:
+$$\text{Total Stage Slots} = 5 \times \text{Total Cycles} = \text{Useful Instruction Slots} + \text{Bubble Slots}$$
+
+---
+
+## 🧪 Verification & How to Run Tests
+
+Manikanth's subsystem is backed by 100% passing automated test suites:
+
+```bash
+# 1. Run all Hazard Detection and Analytics unit tests
+pytest tests/test_hazards.py tests/test_analytics.py tests/test_metrics.py -v
+
+# 2. Run the Autonomous Hazard Analysis Bot (Conservation Law Audits)
+python -m bots.hazard_bot
 ```
 
-Run all 5 autonomous verification bots:
-```powershell
-py -3.12 -m bots                  # 128 / 128 invariant checks (100% pass)
-```
-
-Run performance benchmark:
-```powershell
-py -3.12 -m tests.benchmark
-```
+### ✅ Verification Results
+- **Unit Tests**: `test_hazards.py`, `test_analytics.py`, `test_metrics.py` all **PASSED** (0 failures).
+- **HazardBot Invariants**: **76 / 76 checks PASSED** (0 double counting, 100% slot conservation verified).
+- **CI Status**: GitHub Actions Workflow **GREEN (Success ✅)**.
