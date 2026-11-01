@@ -22,6 +22,84 @@ Rehman's subsystem:
 
 ---
 
+## 🧠 Algorithms Implemented & Complexity Analysis
+
+Rehman engineered three compiler front-end algorithms providing high parsing speed, robust error containment, and intelligent diagnostics:
+
+### Algorithm 1: Two-Pass Lexical Tokenization & Symbol Table Indexing (`parse_program`)
+- **Purpose**: Translates multi-line assembly text into validated `Instruction` objects while correctly binding forward and backward branch/jump target labels.
+- **Pseudocode**:
+  ```python
+  def parse_program(assembly_text):
+      lines = assembly_text.splitlines()
+      symbol_table = {}
+      cleaned_lines = []
+      
+      # PASS 1: Sanitize, strip comments, and record label definitions
+      instruction_index = 0
+      for line_num, raw_line in enumerate(lines, start=1):
+          # Strip comments (#, ;, //) and whitespace
+          line = strip_comments_and_whitespace(raw_line)
+          if not line:
+              continue
+          
+          # Check for label definition (e.g., "loop:" or "loop: ADD R1, R2, R3")
+          if ':' in line:
+              label, remainder = line.split(':', 1)
+              label = label.strip()
+              validate_label_name(label, line_num)
+              symbol_table[label] = instruction_index
+              line = remainder.strip()
+          
+          if line:
+              cleaned_lines.append((line_num, line))
+              instruction_index += 1
+      
+      # PASS 2: Parse opcodes, validate registers, and resolve target labels
+      instructions = []
+      for line_num, line in cleaned_lines:
+          tokens = tokenize_operands(line)
+          opcode = tokens[0].upper()
+          
+          validate_opcode(opcode, line_num)
+          operands = parse_and_validate_operands(opcode, tokens[1:], line_num)
+          
+          # Resolve branch/jump label targets
+          if opcode in BRANCH_OPCODES or opcode in JUMP_OPCODES:
+              target_label = operands.label
+              if target_label not in symbol_table:
+                  raise SyntaxError(f"Line {line_num}: Unresolved label '{target_label}'")
+              operands.target_index = symbol_table[target_label]
+          
+          instructions.append(Instruction(opcode=opcode, operands=operands, line_number=line_num))
+      
+      return ParseResult(instructions=instructions, symbol_table=symbol_table)
+  ```
+- **Complexity**:
+  - **Time Complexity**: $\mathcal{O}(L + N)$ where $L$ is total text lines and $N$ is instruction count. Guaranteed linear two-pass execution.
+  - **Space Complexity**: $\mathcal{O}(N)$ for symbol table mapping and tokenized instruction sequence.
+
+---
+
+### Algorithm 2: Two's Complement Immediate Bound & Memory Operand Parsing
+- **Purpose**: Validates memory offset syntax `offset(base)` and immediate integer limits according to MIPS architecture specifications.
+- **Formulas & Invariants**:
+  - Signed 16-bit Immediate Range:
+    $$-2^{15} \le \text{imm} \le 2^{15} - 1 \implies [-32,768, \; 32,767]$$
+  - Unsigned Immediate Range:
+    $$0 \le \text{imm} \le 2^{16} - 1 \implies [0, \; 65,535]$$
+  - Memory Offset Extraction:
+    $$\text{Regex Pattern}: \quad \text{r}"\^\s\*([+-]?\d+)\s\*\(\s\*\$?([rR]?\d+)\s\*\)\s\*\$"$$
+- **Complexity**: $\mathcal{O}(1)$ regex and arithmetic evaluation per instruction.
+
+---
+
+### Algorithm 3: Gestalt Pattern Typo Suggestion Algorithm (`suggest_opcode`)
+- **Purpose**: When an unrecognized opcode is entered, computes similarity metric against known ISA opcodes using Ratcliff-Obershelp gestalt pattern matching (`difflib.get_close_matches`), producing helpful hints (e.g., *“Unknown opcode 'AD'. Did you mean 'ADD'?”*).
+- **Complexity**: $\mathcal{O}(K \times M)$ where $K$ is total known opcodes ($K \approx 15$) and $M$ is string length ($M \le 5$), executing in sub-millisecond time.
+
+---
+
 ## 📦 Delivered Modules & File Explanations
 
 | Module / File | Component Responsibility & Implementation Details |
