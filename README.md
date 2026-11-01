@@ -24,6 +24,72 @@ Lathish's subsystem:
 
 ---
 
+## 🧠 Algorithms Implemented & Complexity Analysis
+
+Lathish engineered three microarchitectural control algorithms governing hardware multiplexer routing and speculative branch recovery:
+
+### Algorithm 1: Hardware Bypass Forwarding Multiplexer Routing (`resolve_forwarding`)
+- **Purpose**: Evaluates bypass conditions for ALU inputs $A$ and $B$ in the `EX` stage, enforcing newest-producer priority and $R0$ exclusion.
+- **Multiplexer Truth Table**:
+  | Control Code | Forward Path | Source Stage | Description |
+  |:---:|:---:|:---:|:---|
+  | `00` | No Forwarding | Register File | Operand read directly from register file during `ID` |
+  | `10` | `EX/MEM -> EX` | `MEM` Stage | Distance-1 bypass: newest result forwarded from `EX/MEM` latch |
+  | `01` | `MEM/WB -> EX` | `WB` Stage | Distance-2 bypass: result forwarded from `MEM/WB` latch |
+
+- **Pseudocode**:
+  ```python
+  def resolve_forwarding(id_ex, ex_mem, mem_wb):
+      forward_a = "00"  # Default: register file
+      forward_b = "00"
+      
+      # 1. Forward to Operand A (rs)
+      if ex_mem and ex_mem.reg_write and ex_mem.rd != 0 and ex_mem.rd == id_ex.rs:
+          forward_a = "10"  # EX/MEM -> EX has newest priority!
+      elif mem_wb and mem_wb.reg_write and mem_wb.rd != 0 and mem_wb.rd == id_ex.rs:
+          forward_a = "01"  # MEM/WB -> EX
+          
+      # 2. Forward to Operand B (rt)
+      if ex_mem and ex_mem.reg_write and ex_mem.rd != 0 and ex_mem.rd == id_ex.rt:
+          forward_b = "10"  # EX/MEM -> EX has newest priority!
+      elif mem_wb and mem_wb.reg_write and mem_wb.rd != 0 and mem_wb.rd == id_ex.rt:
+          forward_b = "01"  # MEM/WB -> EX
+          
+      return forward_a, forward_b
+  ```
+- **Complexity**:
+  - **Time Complexity**: $\mathcal{O}(1)$ execution per cycle. Checks 4 conditional clauses over fixed-size integer registers.
+  - **Space Complexity**: $\mathcal{O}(1)$ auxiliary storage.
+
+---
+
+### Algorithm 2: Speculative Branch Recovery & Squashing Algorithm
+- **Purpose**: Controls branch resolution in the `EX` stage and squashes speculatively fetched wrong-path instructions.
+- **Logic**:
+  $$\text{Condition} = \begin{cases} 
+  (rs == rt) & \text{for } \text{BEQ} \\ 
+  (rs \ne rt) & \text{for } \text{BNE} 
+  \end{cases}$$
+  - **Policy `predict_not_taken`**:
+    - If $\text{Condition} == \text{False}$: Branch was correctly predicted not taken. Penalty = $0$ cycles!
+    - If $\text{Condition} == \text{True}$ (Misprediction):
+      1. Flush `IF` stage: overwrite `IF/ID` latch with `BUBBLE(FLUSH)`.
+      2. Flush `ID` stage: overwrite `ID/EX` latch with `BUBBLE(FLUSH)`.
+      3. Redirect Program Counter: $PC \leftarrow \text{BranchTarget}$.
+      4. Incur exact 2-cycle penalty.
+- **Complexity**: $\mathcal{O}(1)$ per branch resolution.
+
+---
+
+### Algorithm 3: Forwarding Telemetry & Stall Avoidance Accounting
+- **Purpose**: Calculates cumulative stall cycles avoided by hardware forwarding:
+  $$\text{Avoided Stalls} = \sum_{t=1}^{C} \left( \text{Stalls}_{\text{NoFwd}}(t) - \text{Stalls}_{\text{Fwd}}(t) \right)$$
+  Computes hardware bypass path efficiency:
+  $$\text{Bypass Efficiency} = \frac{\text{Avoided Stalls}}{\text{Ideal Cycles} + \text{Avoided Stalls}} \times 100\%$$
+- **Complexity**: $\mathcal{O}(1)$ cycle update.
+
+---
+
 ## 📦 Delivered Modules & File Explanations
 
 | Module / File | Component Responsibility & Implementation Details |
@@ -34,34 +100,6 @@ Lathish's subsystem:
 | [`tests/test_forwarding.py`](tests/test_forwarding.py) | **Forwarding Unit Test Suite**<br>Verifies Distance-1 and Distance-2 forwarding, priority resolution between overlapping producers, load-use stall insertion despite forwarding, and $R0$ bypass suppression. |
 | [`tests/test_audit_and_regressions.py`](tests/test_audit_and_regressions.py) | **Control Hazard & Flush Regression Test Suite**<br>Verifies pipeline flush consistency, speculative slot squashing, and branch penalty calculations. |
 | [`examples/control_flow/loop_countdown.s`](examples/control_flow/loop_countdown.s) | **Tight Loop Control Flow Benchmark**<br>Iterative countdown loop testing branch condition evaluation, branch flush squashing, and cyclic dependency forwarding. |
-
----
-
-## 🔀 Hardware Forwarding Multiplexer Logic
-
-The forwarding unit controls two multiplexers (`ForwardA` and `ForwardB`) feeding the ALU inputs in the `EX` stage:
-
-```
-                  +-----------------------------------+
-                  |         EX/MEM Pipeline Latch     |
-                  +-----------------+-----------------+
-                                    |
-                  +-----------------|-----------------+
-                  |         MEM/WB Pipeline Latch     |
-                  +--------+--------+--------+--------+
-                           |                 |
-                           v                 v
-                 [ ForwardA MUX ]    [ ForwardB MUX ]
-                           |                 |
-                           +--------+--------+
-                                    |
-                                    v
-                           [    ALU Stage    ]
-```
-
-### Forwarding Conditions:
-- **`EX/MEM -> EX`**: If `EX/MEM.RegWrite` and `EX/MEM.RegisterRd != 0` and `EX/MEM.RegisterRd == ID/EX.RegisterRs` $\implies \text{ForwardA} = 10_2$.
-- **`MEM/WB -> EX`**: If `MEM/WB.RegWrite` and `MEM/WB.RegisterRd != 0` and `MEM/WB.RegisterRd == ID/EX.RegisterRs` (and not forwarded from EX/MEM) $\implies \text{ForwardA} = 01_2$.
 
 ---
 
