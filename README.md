@@ -27,6 +27,84 @@ Likhith's subsystem:
 
 ---
 
+## 🧠 Algorithms Implemented & Complexity Analysis
+
+Likhith engineered three foundational microarchitectural algorithms governing synchronous cycle execution:
+
+### Algorithm 1: Synchronous Reverse-Stage Pipeline Progression (`step`)
+- **Purpose**: Advances the physical pipeline by exactly one clock cycle. Updates are executed in **reverse stage order** ($WB \to MEM \to EX \to ID \to IF$) to prevent output-input overwrite hazards within the same cycle.
+- **Pseudocode**:
+  ```python
+  def step(self):
+      cycle = self.current_cycle + 1
+      
+      # 1. WB Stage: Commit instruction and write back to register file
+      wb_inst = self.latch_MEM_WB
+      if wb_inst and is_real(wb_inst):
+          if wb_inst.writes_reg and wb_inst.dest != 0:
+              self.registers[wb_inst.dest] = wb_inst.computed_result
+          self.retired_instructions += 1
+      
+      # 2. MEM Stage: Read/Write RAM and latch into MEM/WB
+      mem_inst = self.latch_EX_MEM
+      if mem_inst and is_real(mem_inst):
+          if mem_inst.opcode == 'LW':
+              mem_inst.computed_result = self.memory.read(mem_inst.memory_address)
+          elif mem_inst.opcode == 'SW':
+              self.memory.write(mem_inst.memory_address, mem_inst.store_value)
+      self.latch_MEM_WB = mem_inst
+      
+      # 3. EX Stage: Compute ALU operation or address and latch into EX/MEM
+      ex_inst = self.latch_ID_EX
+      if ex_inst and is_real(ex_inst):
+          op1, op2 = self.forwarding_unit.resolve_operands(ex_inst, self.latch_EX_MEM, self.latch_MEM_WB)
+          ex_inst.computed_result = execute_alu(ex_inst.opcode, op1, op2)
+      self.latch_EX_MEM = ex_inst
+      
+      # 4. ID Stage: Hazard Check & Latch to ID/EX
+      stall = self.hazard_unit.detect_data_stall(self.latch_IF_ID, ex_inst, mem_inst, wb_inst)
+      if stall:
+          # FREEZE IF and ID stages; inject bubble into ID/EX
+          self.latch_ID_EX = create_bubble(cycle, reason=stall.reason)
+          # IF/ID remains unchanged; PC remains unchanged
+      else:
+          id_inst = self.latch_IF_ID
+          if id_inst and is_real(id_inst):
+              id_inst.val_rs = self.registers[id_inst.rs]
+              id_inst.val_rt = self.registers[id_inst.rt]
+          self.latch_ID_EX = id_inst
+          
+          # 5. IF Stage: Fetch next instruction from PC and increment PC
+          if self.pc < len(self.instructions):
+              self.latch_IF_ID = create_dynamic(self.instructions[self.pc], cycle)
+              self.pc += 1
+          else:
+              self.latch_IF_ID = None
+  ```
+- **Complexity**:
+  - **Time Complexity**: $\mathcal{O}(1)$ per clock cycle. Bounded strictly by 5 stage updates and a fixed 32-register register file. Total time: $\mathcal{O}(C)$ for $C$ cycles.
+  - **Space Complexity**: $\mathcal{O}(1)$ active state; $\mathcal{O}(C)$ history recording for interactive GUI scrubbing.
+
+---
+
+### Algorithm 2: Gold-Standard Reference CPU Sequential Emulation (`run_reference`)
+- **Purpose**: Executes the program sequentially without pipelining (1 instruction completes before the next begins), providing the formal baseline for differential verification.
+- **Logic**:
+  $$\text{State}_{t+1} = \text{Execute}(\text{Decode}(\text{Fetch}(PC_t)), \text{State}_t)$$
+  - Each instruction runs through Fetch $\to$ Decode $\to$ Execute $\to$ Memory $\to$ WriteBack atomically.
+  - Compares final register array $R_{\text{pipe}}[0..31] == R_{\text{ref}}[0..31]$ and memory array $M_{\text{pipe}} == M_{\text{ref}}$.
+- **Complexity**:
+  - **Time Complexity**: $\mathcal{O}(N)$ dynamic instruction executions.
+  - **Space Complexity**: $\mathcal{O}(R + M)$ where $R=32$ registers and $M$ is active memory words.
+
+---
+
+### Algorithm 3: Pedagogical Stage State Introspection (`explain_stage`)
+- **Purpose**: Dynamic narrative generation inspecting active stage latches, operand values, and control flags to generate crystal-clear educational explanations of stage actions.
+- **Complexity**: $\mathcal{O}(1)$ per stage evaluation.
+
+---
+
 ## 📦 Delivered Modules & File Explanations
 
 | Module / File | Component Responsibility & Implementation Details |
