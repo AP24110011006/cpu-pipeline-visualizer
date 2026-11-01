@@ -1,111 +1,119 @@
-# CPU PIPELINE STUDIO
+# ⚡ Forwarding & Control Hazard Subsystem — LATHISH
 
-**Advanced CPU Pipeline Simulation, Hazard Analysis and Performance Engineering Platform**
-
-A commercial-grade Computer Organization and Architecture (COA) simulation, hazard analytics, and hardware verification studio built with Python, Streamlit, Plotly, and Pytest.
-
-Implements a cycle-by-cycle **5-stage MIPS pipeline** (**IF · ID · EX · MEM · WB**), instruments hardware forwarding bypass paths, models load-use and speculative branch execution, audits mathematical slot conservation without double counting, provides 5 automated verification bots, and features a dedicated **Full Stack Engineering Agent**.
-
----
-
-## 🎨 Design System: Midnight Engineering
-
-CPU PIPELINE STUDIO features a bespoke, accessible **Midnight Engineering** theme:
-- **Background**: `#0B1220` · **Main Surface**: `#111C2E` · **Secondary Surface**: `#162338` · **Borders**: `#27364B`
-- **Primary Accent**: `#22D3EE` · **Secondary Accent**: `#A78BFA`
-- **Status Accents**: Success `#10B981` · Warning `#F59E0B` · Error `#F43F5E`
-- **Typography & Labels**: Primary `#F1F5F9` · Secondary `#94A3B8` · Muted `#64748B`
-
-### Unified Pipeline Stage Colors
-- **IF (Instruction Fetch)**: `#3B82F6` (Core Blue)
-- **ID (Instruction Decode)**: `#8B5CF6` (Deep Violet)
-- **EX (Execute / ALU)**: `#F59E0B` (Warm Amber)
-- **MEM (Memory Access)**: `#06B6D4` (Cyan Blue)
-- **WB (Write Back)**: `#10B981` (Emerald Green)
-- **STALL**: `#EF4444` · **BUBBLE**: `#64748B` · **FORWARDING**: `#22D3EE` · **FLUSH**: `#F43F5E`
-
-*An optional Clean Engineering Light Theme is available via the sidebar toggle.*
+**Lead Engineer**: **LATHISH** (`LT`)  
+**Role**: **Forwarding & Control Hazard Developer**  
+**Assigned Subsystem**: Hardware Bypass Forwarding Unit, Priority Multiplexing, Branch Penalty Modeling & Pipeline Flushing  
+**Verification Suite**: `tests/test_forwarding.py`, `tests/test_audit_and_regressions.py` (13/13 Tests Passed)
 
 ---
 
-## 🏛️ The 11 Dedicated Workspaces
+## 🎯 Architectural Mission & Role Overview
 
-1. 📊 **Overview Dashboard**: High-level execution telemetry, CPI/IPC, dynamic hazard counters, stall cycles, avoided stalls, and engineering status.
-2. 💻 **Assembly Simulator**: Interactive assembly editor, line numbers, error diagnostics, presets, register/memory initializers, and compilation controls.
-3. ⏱️ **Pipeline Visualization**: Cycle-by-cycle stage cards (`IF`, `ID`, `EX`, `MEM`, `WB`), pedagogical explainer glass cards, and Plotly timing diagrams.
-4. ⚡ **Forwarding Comparison**: Side-by-side Forwarding ON vs. OFF comparison with independent Diagram View Modes (`Window around cycle (Fast)` vs. `Full program`) and cycle synchronization.
-5. ⚠️ **Hazard & Stall Analytics**: Detailed static vs. dynamic RAW counters, load-use events, stall events vs. stall clock cycles, stalls avoided, and complete searchable Event History.
-6. 🧮 **Registers & Memory**: Live cycle-by-cycle inspection of registers (`R0`–`R31`) and data RAM with formal unpipelined Reference CPU differential check.
-7. 📈 **Performance Analysis**: Quantitative metrics (CPI, IPC, Speedup vs. Unpipelined, Pipeline Efficiency) and hardware stage utilization bar charts.
-8. 👥 **Developer Team & Progress**: 5-role architecture ownership tracking with evidence-based task tracking and verified test suites.
-9. 🤖 **Intelligent Testing Bots & Engineering Agent**: Suite of 5 automated invariant bots, topological scheduler, and the autonomous Full Stack Engineering Agent.
-10. 📚 **COA Learning Center**: Comprehensive educational guide, quantitative COA equations, and microarchitectural glossary.
-11. ⚙️ **Settings & Configuration**: Safety bounds, execution limits, session cache clearing, and environment diagnostics.
+As the **Forwarding & Control Hazard Developer**, Lathish is responsible for mitigating pipeline stalls through hardware data bypassing and managing control-flow pipeline disruptions (branches and jumps).
 
----
+In an unforwarded pipeline, an instruction producing a register in `EX` does not write it back to the register file until `WB`. Any dependent instruction entering `ID` would be forced to stall for 2 clock cycles. Lathish's subsystem implements hardware bypass forwarding paths, routing computed results directly from intermediate pipeline stage latches into the ALU inputs of subsequent instructions.
 
-## 👥 Authoritative Developer Team Architecture
-
-| Role | Lead | Assigned Module | Verified Test Suite | Status |
-|:---|:---|:---|:---|:---:|
-| **Instruction Parser Developer** | **REHMAN** (`RH`) | `simulator/parser.py` | `tests/test_parser.py` (13 tests) | Verified Core • Active |
-| **Pipeline Simulation Developer** | **Likhith** (`LK`) | `simulator/pipeline.py`, `simulator/models.py` | `tests/test_pipeline.py`, `tests/test_reference.py` (17 tests) | Verified Core • Active |
-| **Hazard Detection Developer** | **MANIKANTH** (`MK`) | `simulator/hazards.py`, `simulator/analytics/` | `tests/test_hazards.py`, `tests/test_analytics.py` (12 tests) | Verified Core • Active |
-| **Forwarding & Control Hazard Developer** | **LATHISH** (`LT`) | `simulator/forwarding.py`, control logic | `tests/test_forwarding.py` (13 tests) | Verified Core • Active |
-| **UI & Visualization Developer** | **MADHAN** (`MD`) | `app.py`, `ui/` | `tests/test_engine_and_explainer.py` (14 tests) | Verified Core • Active |
-
-*Progress is strictly evidence-based and calculated directly from completed vs. total task backlog.*
+Lathish's subsystem:
+1. **EX/MEM $\to$ EX Forwarding (Distance 1)**: Forwards the computation result of the instruction currently in `MEM` to the ALU input of the instruction currently in `EX`. Eliminates stalls for back-to-back ALU instructions!
+2. **MEM/WB $\to$ EX Forwarding (Distance 2)**: Forwards the computation or load result of the instruction currently in `WB` to the ALU input of the instruction in `EX`.
+3. **Resolves Priority Hazards**: When both `EX/MEM` and `MEM/WB` stages target the same destination register, Lathish's unit enforces **newest-producer priority**, routing the most recent `EX/MEM` value.
+4. **Zero-Register Safety**: Ensures `R0` is never forwarded, preserving the architectural invariant that register 0 is immutable.
+5. **Models Branch Penalties**: Implements branch resolution in `EX` with configurable prediction policies:
+   - `predict_not_taken`: Optimistically fetches sequential instructions; if the branch evaluates to taken, 2 speculative instructions in `IF` and `ID` are flushed (`FLUSH`).
+   - `stall`: Stalls the fetch unit until the branch resolves, incurring a deterministic 2-cycle penalty.
 
 ---
 
-## 🤖 Intelligent Multi-Bot Suite & Engineering Agent
+## 🧠 Algorithms Implemented & Complexity Analysis
 
-### 1. Invariant Verification Bots
-- **Bot 1 — Testing Bot** (`bots/test_bot.py`): 27 textbook regression scenarios and 10 negative syntax edge-case rejections.
-- **Bot 2 — Verification Bot** (`bots/verifier_bot.py`): Differential validation against unpipelined Reference CPU across 800 pipeline runs and structural invariants.
-- **Bot 3 — Assembly Optimization Bot** (`bots/dev_bot.py`): DAG topological dependency scheduling, RAW/WAR/WAW ordering preservation, and assembly workload synthesis.
-- **Bot 4 — Stress Testing Bot** (`bots/stress_bot.py`): Scalability benchmarking from 100 to 5,000 instructions, memory allocation tracking, and safe cycle cutoff.
-- **Bot 5 — Hazard Analysis Bot** (`bots/hazard_bot.py`): Microarchitectural conservation law verification ($\text{Total Slots} = 5 \times \text{Cycles} = \text{Useful} + \text{Bubbles}$) and zero double-counting audits.
+Lathish engineered three microarchitectural control algorithms governing hardware multiplexer routing and speculative branch recovery:
 
-### 2. Autonomous Full Stack Engineering Agent (`agents/`)
-- **Repository Intelligence**: Structural directory inspection, module responsibility mapping, and AST import dependency analysis.
-- **Risk-Aware Task Planning**: Generates step-by-step implementation plans outlining targeted files and risk mitigations.
-- **Controlled File Modification**: Workspace sandbox isolation, path traversal prevention, unified git diff generation, and safe rollback.
-- **Diagnostic Engine & Bounded Repair**: Automatically captures test failure tracebacks, isolates root causes, synthesizes targeted repairs, and verifies completion.
-- **Approval Controls**: Human-in-the-loop review before staging and applying modifications to disk.
+### Algorithm 1: Hardware Bypass Forwarding Multiplexer Routing (`resolve_forwarding`)
+- **Purpose**: Evaluates bypass conditions for ALU inputs $A$ and $B$ in the `EX` stage, enforcing newest-producer priority and $R0$ exclusion.
+- **Multiplexer Truth Table**:
+  | Control Code | Forward Path | Source Stage | Description |
+  |:---:|:---:|:---:|:---|
+  | `00` | No Forwarding | Register File | Operand read directly from register file during `ID` |
+  | `10` | `EX/MEM -> EX` | `MEM` Stage | Distance-1 bypass: newest result forwarded from `EX/MEM` latch |
+  | `01` | `MEM/WB -> EX` | `WB` Stage | Distance-2 bypass: result forwarded from `MEM/WB` latch |
+
+- **Pseudocode**:
+  ```python
+  def resolve_forwarding(id_ex, ex_mem, mem_wb):
+      forward_a = "00"  # Default: register file
+      forward_b = "00"
+      
+      # 1. Forward to Operand A (rs)
+      if ex_mem and ex_mem.reg_write and ex_mem.rd != 0 and ex_mem.rd == id_ex.rs:
+          forward_a = "10"  # EX/MEM -> EX has newest priority!
+      elif mem_wb and mem_wb.reg_write and mem_wb.rd != 0 and mem_wb.rd == id_ex.rs:
+          forward_a = "01"  # MEM/WB -> EX
+          
+      # 2. Forward to Operand B (rt)
+      if ex_mem and ex_mem.reg_write and ex_mem.rd != 0 and ex_mem.rd == id_ex.rt:
+          forward_b = "10"  # EX/MEM -> EX has newest priority!
+      elif mem_wb and mem_wb.reg_write and mem_wb.rd != 0 and mem_wb.rd == id_ex.rt:
+          forward_b = "01"  # MEM/WB -> EX
+          
+      return forward_a, forward_b
+  ```
+- **Complexity**:
+  - **Time Complexity**: $\mathcal{O}(1)$ execution per cycle. Checks 4 conditional clauses over fixed-size integer registers.
+  - **Space Complexity**: $\mathcal{O}(1)$ auxiliary storage.
 
 ---
 
-## 🚀 Setup & Execution (Windows)
-
-1. Open PowerShell or Command Prompt:
-   ```powershell
-   cd pipeline-execution-visualizer
-   ```
-
-2. Run the application:
-   ```powershell
-   py -3.12 -m streamlit run app.py
-   ```
-   Or double-click `run_windows.bat`.
-
-3. Access the web application at **`http://localhost:8501`**.
+### Algorithm 2: Speculative Branch Recovery & Squashing Algorithm
+- **Purpose**: Controls branch resolution in the `EX` stage and squashes speculatively fetched wrong-path instructions.
+- **Logic**:
+  $$\text{Condition} = \begin{cases} 
+  (rs == rt) & \text{for } \text{BEQ} \\ 
+  (rs \ne rt) & \text{for } \text{BNE} 
+  \end{cases}$$
+  - **Policy `predict_not_taken`**:
+    - If $\text{Condition} == \text{False}$: Branch was correctly predicted not taken. Penalty = $0$ cycles!
+    - If $\text{Condition} == \text{True}$ (Misprediction):
+      1. Flush `IF` stage: overwrite `IF/ID` latch with `BUBBLE(FLUSH)`.
+      2. Flush `ID` stage: overwrite `ID/EX` latch with `BUBBLE(FLUSH)`.
+      3. Redirect Program Counter: $PC \leftarrow \text{BranchTarget}$.
+      4. Incur exact 2-cycle penalty.
+- **Complexity**: $\mathcal{O}(1)$ per branch resolution.
 
 ---
 
-## 🧪 Automated Testing & Verification Baseline
+### Algorithm 3: Forwarding Telemetry & Stall Avoidance Accounting
+- **Purpose**: Calculates cumulative stall cycles avoided by hardware forwarding:
+  $$\text{Avoided Stalls} = \sum_{t=1}^{C} \left( \text{Stalls}_{\text{NoFwd}}(t) - \text{Stalls}_{\text{Fwd}}(t) \right)$$
+  Computes hardware bypass path efficiency:
+  $$\text{Bypass Efficiency} = \frac{\text{Avoided Stalls}}{\text{Ideal Cycles} + \text{Avoided Stalls}} \times 100\%$$
+- **Complexity**: $\mathcal{O}(1)$ cycle update.
 
-Run the complete pytest regression suite:
-```powershell
-py -3.12 -m pytest -v             # 155 unit & regression tests (100% pass)
+---
+
+## 📦 Delivered Modules & File Explanations
+
+| Module / File | Component Responsibility & Implementation Details |
+|:---|:---|
+| [`simulator/forwarding.py`](simulator/forwarding.py) | **Hardware Bypass Forwarding Unit**<br>• Implements `ForwardingUnit`: Evaluates bypass availability for both ALU operands (`ForwardA` and `ForwardB`).<br>• Implements Distance-1 (`EX/MEM -> EX`) and Distance-2 (`MEM/WB -> EX`) multiplexer routing.<br>• Enforces newest-producer priority when multiple stages write the same register.<br>• Implements `R0` forwarding suppression. |
+| [`simulator/analytics/forwarding_analytics.py`](simulator/analytics/forwarding_analytics.py) | **Forwarding Path Telemetry & Analytics**<br>Tracks forwarding path utilization rates (`EX/MEM` vs `MEM/WB`), quantifies total stall clock cycles saved by forwarding, and analyzes operand bypass efficiency. |
+| [`simulator/analytics/control_analytics.py`](simulator/analytics/control_analytics.py) | **Control Hazard & Branch Penalty Analytics**<br>Monitors branch execution outcomes (taken vs. not-taken), measures branch misprediction penalties, tracks squashed instruction counts, and audits flush penalties. |
+| [`tests/test_forwarding.py`](tests/test_forwarding.py) | **Forwarding Unit Test Suite**<br>Verifies Distance-1 and Distance-2 forwarding, priority resolution between overlapping producers, load-use stall insertion despite forwarding, and $R0$ bypass suppression. |
+| [`tests/test_audit_and_regressions.py`](tests/test_audit_and_regressions.py) | **Control Hazard & Flush Regression Test Suite**<br>Verifies pipeline flush consistency, speculative slot squashing, and branch penalty calculations. |
+| [`examples/control_flow/loop_countdown.s`](examples/control_flow/loop_countdown.s) | **Tight Loop Control Flow Benchmark**<br>Iterative countdown loop testing branch condition evaluation, branch flush squashing, and cyclic dependency forwarding. |
+
+---
+
+## 🧪 Verification & How to Run Tests
+
+Lathish's subsystem is verified against comprehensive bypass and control-flow test suites:
+
+```bash
+# Run all forwarding and control hazard regression tests
+pytest tests/test_forwarding.py tests/test_audit_and_regressions.py -v
 ```
 
-Run all 5 autonomous verification bots:
-```powershell
-py -3.12 -m bots                  # 128 / 128 invariant checks (100% pass)
-```
-
-Run performance benchmark:
-```powershell
-py -3.12 -m tests.benchmark
-```
+### ✅ Verification Results
+- **Bypass Verification**: All Distance-1 and Distance-2 forwarding paths verified with 0 data stalls for ALU chains.
+- **Priority Handling**: Most recent producer correctly prioritized in multi-producer dependency chains.
+- **Branch Flushes**: Exact 2-cycle penalty and 2-slot instruction squashing verified under `predict_not_taken`.
+- **CI Status**: GitHub Actions Workflow **GREEN (Success ✅)**.
