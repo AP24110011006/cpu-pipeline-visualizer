@@ -100,9 +100,14 @@ def test_metrics_table_input_flexibility() -> None:
     df_single = metrics_table(res.metrics_primary)
     assert not df_single.empty
     assert "Metric" in df_single.columns
+    assert df_single["Metric"].iloc[0] == "Total cycles"
+    assert df_single["Metric Value"].iloc[0] != "n/a"
 
     # Dict of PerformanceMetrics
     df_dict = metrics_table({"ON": res.metrics_on, "OFF": res.metrics_off})
     assert not df_dict.empty
     assert "ON" in df_dict.columns
     assert "OFF" in df_dict.columns
+    assert df_dict["Metric"].iloc[0] == "Total cycles"
+    assert df_dict["ON"].iloc[0] != "n/a"
+    assert df_dict["OFF"].iloc[0] != "n/a"
