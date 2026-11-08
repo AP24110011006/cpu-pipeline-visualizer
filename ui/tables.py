@@ -95,19 +95,29 @@ def metrics_table(
     else:
         return pd.DataFrame()
 
+    def _format_cell(v: Any) -> str:
+        if v is None:
+            return "n/a"
+        if isinstance(v, float):
+            return f"{v:.3f}"
+        if isinstance(v, int):
+            return f"{v}"
+        return str(v)
+
     columns = {}
     for name, m in mapping.items():
         if hasattr(m, "as_rows"):
-            columns[name] = m.as_rows()
+            raw = m.as_rows()
+            columns[name] = {k: _format_cell(v) for k, v in raw.items()}
         elif isinstance(m, dict):
-            columns[name] = m
+            columns[name] = {k: _format_cell(v) for k, v in m.items()}
 
     if not columns:
         return pd.DataFrame()
 
     frame = pd.DataFrame(columns)
-    frame.insert(0, "Metric", frame.index)
-    return frame.reset_index(drop=True).astype(object).where(frame.notna(), "n/a")
+    frame.insert(0, "Metric", list(frame.index))
+    return frame.reset_index(drop=True)
 
 
 def registers_table(registers: List[int], only_nonzero: bool) -> pd.DataFrame:
